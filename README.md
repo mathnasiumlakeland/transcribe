@@ -1,6 +1,4 @@
-# Static Site
-
-Browser-only WebGPU transcription app modeled after the Cohere WebGPU space, but adapted for realistic static hosting constraints.
+# 🎤 🙊
 
 ## Run
 
