@@ -659,7 +659,7 @@ function App() {
               <p>Create a high-quality transcript</p>
             </button>
             <button type="button" className="mode-card" onClick={() => selectMode("timestamps")}>
-              <h2>Timestamps</h2>
+              <h2>Captions</h2>
               <p>Create a timestamped transcript</p>
             </button>
           </div>
