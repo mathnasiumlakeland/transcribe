@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import AudioWaveform from "./AudioWaveform";
 import LiveWaveform from "./LiveWaveform";
 import {
   createFileDescriptor,
@@ -184,11 +185,12 @@ function App() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [displayTranscript?.text, isTranscribing]);
 
-  useEffect(() => {
+  const positionUnderline = (animate: boolean) => {
     const bar = underlineRef.current;
-    if (!bar || !activeWordId) return;
+    const wordId = activeWordId;
+    if (!bar || !wordId) return;
 
-    const wordEl = wordElementRefs.current[activeWordId];
+    const wordEl = wordElementRefs.current[wordId];
     const listEl = transcriptScrollRef.current;
     if (!wordEl || !listEl) return;
 
@@ -202,7 +204,7 @@ function App() {
     const prevY = parseFloat(bar.dataset.lastY ?? "");
     const lineJump = !underlineReady.current || (Number.isFinite(prevY) && Math.abs(y - prevY) > 8);
 
-    if (lineJump) {
+    if (!animate || lineJump) {
       bar.style.transition = "none";
       bar.style.transform = `translate(${x}px, ${y}px)`;
       bar.style.width = `${w}px`;
@@ -217,6 +219,18 @@ function App() {
     }
 
     bar.dataset.lastY = String(y);
+  };
+
+  useEffect(() => {
+    positionUnderline(true);
+  }, [activeWordId]);
+
+  useEffect(() => {
+    const listEl = transcriptScrollRef.current;
+    if (!listEl) return;
+    const ro = new ResizeObserver(() => positionUnderline(false));
+    ro.observe(listEl);
+    return () => ro.disconnect();
   }, [activeWordId]);
 
   /* ── State helpers ───────────────────────────────── */
@@ -701,7 +715,7 @@ function App() {
           {/* Timestamp workspace — side by side */}
           {showTimestampView && modelState.status === "ready" && (
             <div className="timestamp-workspace">
-              <div className="media-side">
+              <div className={`media-side${localMediaKind === "audio" ? " audio-mode" : ""}`}>
                 {localMediaKind === "video" ? (
                   <video
                     key={localMediaUrl}
@@ -717,16 +731,13 @@ function App() {
                     onSeeked={handleMediaTimeUpdate}
                   />
                 ) : (
-                  <audio
-                    key={localMediaUrl}
-                    ref={(node) => {
-                      mediaElementRef.current = node;
-                    }}
+                  <AudioWaveform
                     src={localMediaUrl!}
-                    controls
-                    preload="metadata"
-                    onLoadedMetadata={handleMediaLoaded}
+                    mediaRef={mediaElementRef as React.RefObject<HTMLAudioElement | null>}
+                    currentTime={mediaTime}
+                    duration={mediaDuration}
                     onTimeUpdate={handleMediaTimeUpdate}
+                    onLoaded={handleMediaLoaded}
                     onSeeked={handleMediaTimeUpdate}
                   />
                 )}
@@ -815,7 +826,7 @@ function App() {
 
                 {userScrolledAway && canSyncPlayback && (
                   <button type="button" className="jump-to-current" onClick={jumpToActiveChunk}>
-                    ↓ Jump to current
+                    ↓ Focus view
                   </button>
                 )}
 
