@@ -185,12 +185,38 @@ function App() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [displayTranscript?.text, isTranscribing]);
 
-  const positionUnderline = (animate: boolean) => {
-    const bar = underlineRef.current;
-    const wordId = activeWordId;
-    if (!bar || !wordId) return;
+  const lineJumpTimerRef = useRef<number>(0);
+  const activeWordIdRef = useRef(activeWordId);
+  activeWordIdRef.current = activeWordId;
+  const resizeDebounceRef = useRef<number>(0);
 
+  const snapUnderline = () => {
+    const bar = underlineRef.current;
+    const wordId = activeWordIdRef.current;
+    if (!bar || !wordId) return;
     const wordEl = wordElementRefs.current[wordId];
+    const listEl = transcriptScrollRef.current;
+    if (!wordEl || !listEl) return;
+
+    const wordRect = wordEl.getBoundingClientRect();
+    const listRect = listEl.getBoundingClientRect();
+    const x = wordRect.left - listRect.left + listEl.scrollLeft;
+    const y = wordRect.bottom - listRect.top + listEl.scrollTop + 2;
+    const w = wordRect.width;
+
+    bar.style.transition = "none";
+    bar.style.transform = `translate(${x}px, ${y}px)`;
+    bar.style.width = `${w}px`;
+    bar.style.opacity = "1";
+    bar.offsetHeight;
+    bar.dataset.lastY = String(y);
+  };
+
+  useEffect(() => {
+    const bar = underlineRef.current;
+    if (!bar || !activeWordId) return;
+
+    const wordEl = wordElementRefs.current[activeWordId];
     const listEl = transcriptScrollRef.current;
     if (!wordEl || !listEl) return;
 
@@ -202,36 +228,53 @@ function App() {
     const w = wordRect.width;
 
     const prevY = parseFloat(bar.dataset.lastY ?? "");
-    const lineJump = !underlineReady.current || (Number.isFinite(prevY) && Math.abs(y - prevY) > 8);
+    const isLineJump = !underlineReady.current || (Number.isFinite(prevY) && Math.abs(y - prevY) > 8);
 
-    if (!animate || lineJump) {
-      bar.style.transition = "none";
-      bar.style.transform = `translate(${x}px, ${y}px)`;
-      bar.style.width = `${w}px`;
-      bar.style.opacity = "1";
-      bar.offsetHeight;
-      bar.style.transition = "";
-      underlineReady.current = true;
+    clearTimeout(lineJumpTimerRef.current);
+
+    if (isLineJump) {
+      bar.style.transition = "opacity 80ms ease-out";
+      bar.style.opacity = "0";
+      lineJumpTimerRef.current = window.setTimeout(() => {
+        bar.style.transition = "none";
+        bar.style.transform = `translate(${x}px, ${y}px)`;
+        bar.style.width = `${w}px`;
+        bar.offsetHeight;
+        bar.style.transition = "opacity 80ms ease-in";
+        bar.style.opacity = "1";
+        underlineReady.current = true;
+      }, 90);
     } else {
+      bar.style.transition =
+        "transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1), width 180ms cubic-bezier(0.25, 0.1, 0.25, 1)";
       bar.style.transform = `translate(${x}px, ${y}px)`;
       bar.style.width = `${w}px`;
       bar.style.opacity = "1";
     }
 
     bar.dataset.lastY = String(y);
-  };
-
-  useEffect(() => {
-    positionUnderline(true);
   }, [activeWordId]);
 
   useEffect(() => {
     const listEl = transcriptScrollRef.current;
     if (!listEl) return;
-    const ro = new ResizeObserver(() => positionUnderline(false));
+    let lastWidth = listEl.clientWidth;
+    let lastHeight = listEl.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const w = listEl.clientWidth;
+      const h = listEl.clientHeight;
+      if (w === lastWidth && h === lastHeight) return;
+      lastWidth = w;
+      lastHeight = h;
+      clearTimeout(resizeDebounceRef.current);
+      resizeDebounceRef.current = window.setTimeout(snapUnderline, 50);
+    });
     ro.observe(listEl);
-    return () => ro.disconnect();
-  }, [activeWordId]);
+    return () => {
+      ro.disconnect();
+      clearTimeout(resizeDebounceRef.current);
+    };
+  }, []);
 
   /* ── State helpers ───────────────────────────────── */
 

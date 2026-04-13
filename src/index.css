@@ -608,7 +608,6 @@ button {
   display: inline;
   cursor: pointer;
   border-radius: 2px;
-  padding: 0 1px;
   transition: background 150ms ease;
 }
 
@@ -629,10 +628,9 @@ button {
   opacity: 0;
   transform-origin: left center;
   transition:
-    transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    width 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 150ms ease;
-  will-change: transform, width;
+    transform 180ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    width 180ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  will-change: transform, width, opacity;
 }
 
 /* ── Transcript side actions ───────────────────────── */
