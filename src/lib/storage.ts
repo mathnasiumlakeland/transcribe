@@ -153,6 +153,14 @@ export function downloadJson(
   URL.revokeObjectURL(url);
 }
 
+export function downloadSrt(record: Pick<TranscriptRecord, "jsonFilename" | "chunks">): void {
+  downloadTextFile(buildSrt(record.chunks), replaceExtension(record.jsonFilename, "srt"), "text/plain;charset=utf-8");
+}
+
+export function downloadVtt(record: Pick<TranscriptRecord, "jsonFilename" | "chunks">): void {
+  downloadTextFile(buildVtt(record.chunks), replaceExtension(record.jsonFilename, "vtt"), "text/vtt;charset=utf-8");
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -167,6 +175,70 @@ function timestampForFilename(isoString: string): string {
     .replace(/\.\d{3}Z$/, "Z")
     .replace("T", "-")
     .replace("Z", "");
+}
+
+function buildSrt(chunks: TranscriptChunk[]): string {
+  return chunks
+    .map((chunk, index) => {
+      const { start, end } = getCueTiming(chunks, index);
+      return [String(index + 1), `${formatCaptionTime(start, ",")} --> ${formatCaptionTime(end, ",")}`, chunk.text.trim(), ""]
+        .join("\n");
+    })
+    .join("\n")
+    .trimEnd();
+}
+
+function buildVtt(chunks: TranscriptChunk[]): string {
+  const body = chunks
+    .map((chunk, index) => {
+      const { start, end } = getCueTiming(chunks, index);
+      return [`${formatCaptionTime(start, ".")} --> ${formatCaptionTime(end, ".")}`, chunk.text.trim(), ""].join("\n");
+    })
+    .join("\n")
+    .trimEnd();
+
+  return `WEBVTT\n\n${body}`;
+}
+
+function getCueTiming(chunks: TranscriptChunk[], index: number): { start: number; end: number } {
+  const chunk = chunks[index];
+  const nextStart = chunks[index + 1]?.start;
+  const start = Math.max(0, chunk.start);
+  const fallbackEnd = nextStart != null ? Math.max(start + 0.01, nextStart) : start + 2;
+  const end = chunk.end != null ? Math.max(start + 0.01, chunk.end) : fallbackEnd;
+  return { start, end };
+}
+
+function formatCaptionTime(value: number, millisecondsSeparator: "," | "."): string {
+  const totalMilliseconds = Math.max(0, Math.round(value * 1000));
+  const hours = Math.floor(totalMilliseconds / 3_600_000)
+    .toString()
+    .padStart(2, "0");
+  const minutes = Math.floor((totalMilliseconds % 3_600_000) / 60_000)
+    .toString()
+    .padStart(2, "0");
+  const seconds = Math.floor((totalMilliseconds % 60_000) / 1000)
+    .toString()
+    .padStart(2, "0");
+  const milliseconds = Math.floor(totalMilliseconds % 1000)
+    .toString()
+    .padStart(3, "0");
+
+  return `${hours}:${minutes}:${seconds}${millisecondsSeparator}${milliseconds}`;
+}
+
+function replaceExtension(filename: string, extension: string): string {
+  return filename.replace(/\.[^.]+$/, `.${extension}`);
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function hydrateRecord(record: Partial<TranscriptRecord>, index: number): TranscriptRecord | null {

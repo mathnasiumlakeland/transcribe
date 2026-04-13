@@ -14,6 +14,8 @@ import {
   createTranscriptRecord,
   downloadJson,
   downloadMarkdown,
+  downloadSrt,
+  downloadVtt,
   loadHistory,
   saveHistory,
   type TranscriptRecord,
@@ -742,6 +744,9 @@ function App() {
                     {displayTranscript?.tps && (
                       <span className="tps-badge">{displayTranscript.tps.toFixed(1)} tok/s</span>
                     )}
+                    <button type="button" className="btn" onClick={handleCopyTranscript}>
+                      {copied ? "Copied" : "Copy text"}
+                    </button>
                     <button
                       type="button"
                       className="btn"
@@ -749,9 +754,6 @@ function App() {
                       onClick={() => currentRecord && downloadMarkdown(currentRecord)}
                     >
                       Download markdown
-                    </button>
-                    <button type="button" className="btn" onClick={handleCopyTranscript}>
-                      {copied ? "Copied" : "Copy text"}
                     </button>
                   </div>
                 </div>
@@ -878,6 +880,9 @@ function App() {
                 )}
 
                 <div className="transcript-side-actions">
+                  <button type="button" className="btn" disabled={!displayTranscript?.text} onClick={handleCopyTranscript}>
+                    {copied ? "Copied" : "Copy"}
+                  </button>
                   <button
                     type="button"
                     className="btn"
@@ -886,8 +891,21 @@ function App() {
                   >
                     Markdown
                   </button>
-                  <button type="button" className="btn" disabled={!displayTranscript?.text} onClick={handleCopyTranscript}>
-                    {copied ? "Copied" : "Copy"}
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={!currentRecord?.chunks.length}
+                    onClick={() => currentRecord && downloadSrt(currentRecord)}
+                  >
+                    SRT
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={!currentRecord?.chunks.length}
+                    onClick={() => currentRecord && downloadVtt(currentRecord)}
+                  >
+                    VTT
                   </button>
                   <button
                     type="button"
