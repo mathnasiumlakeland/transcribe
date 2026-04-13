@@ -281,6 +281,24 @@ button {
   border-color: #a00;
 }
 
+/* ── Recording waveform ───────────────────────────── */
+
+.recording-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+.live-waveform {
+  width: 100%;
+  height: 64px;
+  border-radius: 8px;
+  background: #1a1a1a;
+}
+
 .file-input {
   display: none;
 }

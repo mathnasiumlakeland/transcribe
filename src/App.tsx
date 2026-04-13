@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import LiveWaveform from "./LiveWaveform";
 import {
   createFileDescriptor,
   createMicrophoneDescriptor,
@@ -73,6 +74,9 @@ function App() {
   });
   const [isDragOver, setIsDragOver] = useState(false);
   const [userScrolledAway, setUserScrolledAway] = useState(false);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<number>(0);
   const isAutoScrolling = useRef(false);
 
   const dragCounter = useRef(0);
@@ -265,6 +269,7 @@ function App() {
     mediaRecorderRef.current = null;
     captureStreamRef.current = null;
 
+    setActiveStream(null);
     setCaptureState({ status: "idle", seconds: 0 });
     setScreen("select");
     setSource(null);
@@ -385,6 +390,7 @@ function App() {
 
   const beginCapture = (stream: MediaStream, recorderOptions?: MediaRecorderOptions) => {
     captureStreamRef.current = stream;
+    setActiveStream(stream);
     capturedChunksRef.current = [];
     const recorder = recorderOptions ? new MediaRecorder(stream, recorderOptions) : new MediaRecorder(stream);
     mediaRecorderRef.current = recorder;
@@ -395,6 +401,7 @@ function App() {
     recorder.onstop = () => {
       stopTracks(stream);
       captureStreamRef.current = null;
+      setActiveStream(null);
     };
     recorder.start(1000);
 
@@ -557,7 +564,11 @@ function App() {
   };
 
   const handleCopyTranscript = async () => {
-    if (displayTranscript?.text) await navigator.clipboard.writeText(displayTranscript.text);
+    if (!displayTranscript?.text) return;
+    await navigator.clipboard.writeText(displayTranscript.text);
+    setCopied(true);
+    clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
   };
 
   /* ── Render ──────────────────────────────────────── */
@@ -580,7 +591,7 @@ function App() {
       {screen === "select" && (
         <div className="select-screen">
           <h1 className="select-title">Transcribe</h1>
-          <p className="select-subtitle">Browser-based transcription with WebGPU</p>
+          <p className="select-subtitle">Offline, local transcription with WebGPU</p>
           <div className="mode-cards">
             <button type="button" className="mode-card" onClick={() => selectMode("accuracy")}>
               <h2>Accuracy</h2>
@@ -622,9 +633,12 @@ function App() {
             <div className="accuracy-workspace">
               <div className={`input-section${hasAccuracyText ? " compact" : ""}`}>
                 {captureState.status === "recording" ? (
-                  <button type="button" className="btn recording" onClick={toggleRecording}>
-                    Stop recording · {formatClockTime(captureState.seconds)}
-                  </button>
+                  <div className="recording-section">
+                    {activeStream && <LiveWaveform stream={activeStream} />}
+                    <button type="button" className="btn recording" onClick={toggleRecording}>
+                      Stop recording · {formatClockTime(captureState.seconds)}
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <p className="input-prompt">{isTranscribing ? "Transcribing…" : "Drop a file anywhere, or"}</p>
@@ -676,7 +690,7 @@ function App() {
                       Download markdown
                     </button>
                     <button type="button" className="btn" onClick={handleCopyTranscript}>
-                      Copy text
+                      {copied ? "Copied" : "Copy text"}
                     </button>
                   </div>
                 </div>
@@ -815,7 +829,7 @@ function App() {
                     Markdown
                   </button>
                   <button type="button" className="btn" disabled={!displayTranscript?.text} onClick={handleCopyTranscript}>
-                    Copy
+                    {copied ? "Copied" : "Copy"}
                   </button>
                   <button
                     type="button"

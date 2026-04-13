@@ -9,7 +9,6 @@ export const ACCURACY_MODEL_ID = "onnx-community/cohere-transcribe-03-2026-ONNX"
 let transcriberPromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 let transformersModulePromise: Promise<typeof import("@huggingface/transformers")> | null = null;
 
-let accuracyFileTracker = new Map<string, { loaded: number; total: number }>();
 let accuracyLastPct = 0;
 
 export async function loadAccuracyTranscriber(
@@ -30,7 +29,6 @@ export async function loadAccuracyTranscriber(
   const transformers = await loadTransformersModule();
 
   if (!transcriberPromise) {
-    accuracyFileTracker = new Map();
     accuracyLastPct = 0;
 
     transcriberPromise = transformers.pipeline("automatic-speech-recognition", ACCURACY_MODEL_ID, {
@@ -43,27 +41,11 @@ export async function loadAccuracyTranscriber(
         loaded?: number;
         total?: number;
       }) {
-        if (info.status !== "progress" || !info.file || typeof info.loaded !== "number" || typeof info.total !== "number")
-          return;
+        const nextState = getLoadProgressState(info, accuracyLastPct);
+        if (!nextState) return;
 
-        accuracyFileTracker.set(info.file, { loaded: info.loaded, total: info.total });
-
-        let totalLoaded = 0;
-        let totalSize = 0;
-        for (const entry of accuracyFileTracker.values()) {
-          totalLoaded += entry.loaded;
-          totalSize += entry.total;
-        }
-
-        const pct = totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
-        const progress = Math.max(accuracyLastPct, pct);
-        accuracyLastPct = progress;
-
-        onState({
-          status: "loading",
-          progress,
-          statusText: `Loading model… ${progress}%`,
-        });
+        accuracyLastPct = nextState.progress;
+        onState(nextState);
       },
     }).catch((error: unknown) => {
       transcriberPromise = null;
@@ -132,4 +114,49 @@ async function loadTransformersModule(): Promise<typeof import("@huggingface/tra
   }
 
   return transformersModulePromise;
+}
+
+type LoadProgressInfo = {
+  status: string;
+  progress?: number;
+  file?: string;
+};
+
+function getLoadProgressState(info: LoadProgressInfo, previousProgress: number): ModelState | null {
+  if (info.status === "progress_total" && typeof info.progress === "number") {
+    const progress = clampProgress(info.progress, previousProgress);
+    return {
+      status: "loading",
+      progress,
+      statusText: `Loading model… ${progress}%`,
+    };
+  }
+
+  if (info.status === "download") {
+    return {
+      status: "loading",
+      progress: previousProgress,
+      statusText: formatPendingLoadText("Downloading", info.file, previousProgress),
+    };
+  }
+
+  if (info.status === "done") {
+    return {
+      status: "loading",
+      progress: previousProgress,
+      statusText: formatPendingLoadText("Cached", info.file, previousProgress),
+    };
+  }
+
+  return null;
+}
+
+function clampProgress(value: number, previousProgress: number): number {
+  return Math.max(previousProgress, Math.min(99, Math.round(value)));
+}
+
+function formatPendingLoadText(action: string, file: string | undefined, progress: number): string {
+  const filename = file?.split("/").pop();
+  const prefix = filename ? `${action} ${filename}…` : `${action} model files…`;
+  return progress > 0 ? `${prefix} ${progress}%` : prefix;
 }

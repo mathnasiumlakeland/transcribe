@@ -33,7 +33,6 @@ type WorkerRequest = WarmupRequest | TranscribeRequest;
 env.allowLocalModels = false;
 
 let transcriberPromise: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
-let workerFileTracker = new Map<string, { loaded: number; total: number }>();
 let workerLastPct = 0;
 
 self.addEventListener("message", async (event: MessageEvent<WorkerRequest>) => {
@@ -80,7 +79,6 @@ async function loadTimestampTranscriber(requestId: number): Promise<AutomaticSpe
   }
 
   if (!transcriberPromise) {
-    workerFileTracker = new Map();
     workerLastPct = 0;
 
     transcriberPromise = pipeline("automatic-speech-recognition", TIMESTAMP_MODEL_ID, {
@@ -96,36 +94,11 @@ async function loadTimestampTranscriber(requestId: number): Promise<AutomaticSpe
         loaded?: number;
         total?: number;
       }) {
-        if (
-          info.status !== "progress" ||
-          !info.file ||
-          typeof info.loaded !== "number" ||
-          typeof info.total !== "number"
-        )
-          return;
+        const nextState = getLoadProgressState(info, workerLastPct);
+        if (!nextState) return;
 
-        workerFileTracker.set(info.file, { loaded: info.loaded, total: info.total });
-
-        let totalLoaded = 0;
-        let totalSize = 0;
-        for (const entry of workerFileTracker.values()) {
-          totalLoaded += entry.loaded;
-          totalSize += entry.total;
-        }
-
-        const pct = totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
-        const progress = Math.max(workerLastPct, pct);
-        workerLastPct = progress;
-
-        postMessage({
-          type: "progress",
-          requestId,
-          info: {
-            status: "progress",
-            progress,
-            file: info.file,
-          },
-        });
+        workerLastPct = nextState.progress;
+        postStatus(requestId, nextState);
       },
     }).catch((error: unknown) => {
       transcriberPromise = null;
@@ -277,6 +250,51 @@ function groupWordsIntoSegments(words: TranscriptWord[], minimumGapSeconds: numb
   }
 
   return segments;
+}
+
+type LoadProgressInfo = {
+  status: string;
+  progress?: number;
+  file?: string;
+};
+
+function getLoadProgressState(info: LoadProgressInfo, previousProgress: number): ModelState | null {
+  if (info.status === "progress_total" && typeof info.progress === "number") {
+    const progress = clampProgress(info.progress, previousProgress);
+    return {
+      status: "loading",
+      progress,
+      statusText: `Loading model… ${progress}%`,
+    };
+  }
+
+  if (info.status === "download") {
+    return {
+      status: "loading",
+      progress: previousProgress,
+      statusText: formatPendingLoadText("Downloading", info.file, previousProgress),
+    };
+  }
+
+  if (info.status === "done") {
+    return {
+      status: "loading",
+      progress: previousProgress,
+      statusText: formatPendingLoadText("Cached", info.file, previousProgress),
+    };
+  }
+
+  return null;
+}
+
+function clampProgress(value: number, previousProgress: number): number {
+  return Math.max(previousProgress, Math.min(99, Math.round(value)));
+}
+
+function formatPendingLoadText(action: string, file: string | undefined, progress: number): string {
+  const filename = file?.split("/").pop();
+  const prefix = filename ? `${action} ${filename}…` : `${action} model files…`;
+  return progress > 0 ? `${prefix} ${progress}%` : prefix;
 }
 
 export {};
