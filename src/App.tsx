@@ -77,6 +77,7 @@ function App() {
   const [userScrolledAway, setUserScrolledAway] = useState(false);
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [copied, setCopied] = useState(false);
+  const [focusDirection, setFocusDirection] = useState<"down" | "up">("down");
   const copiedTimerRef = useRef<number>(0);
   const isAutoScrolling = useRef(false);
 
@@ -142,8 +143,8 @@ function App() {
     }
     const activeChunk = findActiveChunk(displayTranscript.chunks, mediaTime);
     const activeWord = findActiveWord(displayTranscript.words, mediaTime);
-    setActiveChunkId(activeChunk?.id ?? displayTranscript.chunks[0]?.id ?? null);
-    setActiveWordId(activeWord?.id ?? null);
+    if (activeChunk) setActiveChunkId(activeChunk.id);
+    if (activeWord) setActiveWordId(activeWord.id);
   }, [displayTranscript, canSyncPlayback, mediaTime]);
 
   useEffect(() => {
@@ -172,6 +173,9 @@ function App() {
       const iRect = item.getBoundingClientRect();
       const visible = iRect.bottom > cRect.top && iRect.top < cRect.bottom;
       setUserScrolledAway(!visible);
+      if (!visible) {
+        setFocusDirection(iRect.top >= cRect.bottom ? "down" : "up");
+      }
     };
 
     container.addEventListener("scroll", onScroll, { passive: true });
@@ -869,7 +873,7 @@ function App() {
 
                 {userScrolledAway && canSyncPlayback && (
                   <button type="button" className="jump-to-current" onClick={jumpToActiveChunk}>
-                    ↓ Focus view
+                    {focusDirection === "down" ? "↓" : "↑"} Focus view
                   </button>
                 )}
 
