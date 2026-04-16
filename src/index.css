@@ -6,6 +6,8 @@
   --line: #e5e5e5;
   --bg: #fff;
   --bg-subtle: #f7f7f7;
+  --paper: #faf9f4;
+  --grid: rgba(17, 17, 17, 0.05);
   --danger: #c00;
 }
 
@@ -83,10 +85,10 @@ button {
 
 .mode-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 1rem;
   margin-top: 2.5rem;
-  width: min(560px, 100%);
+  width: min(760px, 100%);
 }
 
 .mode-card {
@@ -174,9 +176,9 @@ button {
 
 .progress-track {
   width: min(420px, 100%);
-  height: 3px;
+  height: 4px;
   background: var(--line);
-  border-radius: 2px;
+  border-radius: 999px;
   overflow: hidden;
 }
 
@@ -184,8 +186,13 @@ button {
   height: 100%;
   background: var(--ink);
   border-radius: inherit;
-  transition: width 300ms ease;
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: width;
+}
+
+.progress-fill.is-finishing {
+  transition-duration: 760ms;
+  transition-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .loading-status {
@@ -194,6 +201,8 @@ button {
   margin: 0;
   text-align: center;
   max-width: 480px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 /* ── Accuracy workspace ────────────────────────────── */
@@ -203,6 +212,491 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* ── Realtime workspace ───────────────────────────── */
+
+.realtime-workspace {
+  flex: 1;
+  overflow: auto;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at top, rgba(17, 17, 17, 0.03), transparent 42%),
+    linear-gradient(180deg, var(--bg-subtle), var(--bg));
+}
+
+.realtime-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, 100%);
+  min-height: min(760px, calc(100vh - 106px));
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.realtime-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.realtime-kicker {
+  margin: 0 0 0.3rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.realtime-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.4rem, 1.08rem + 1.3vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.realtime-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.realtime-status-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.realtime-status-pill.is-live {
+  color: var(--ink);
+  border-color: rgba(17, 17, 17, 0.15);
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.realtime-status-pill.is-live .realtime-status-dot {
+  animation: realtime-pulse 1.6s ease-in-out infinite;
+}
+
+.realtime-status-pill.is-error {
+  color: var(--danger);
+  border-color: rgba(204, 0, 0, 0.18);
+  background: rgba(204, 0, 0, 0.05);
+}
+
+.realtime-panel-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.realtime-error-box {
+  position: relative;
+  z-index: 1;
+  margin: 1.1rem 1.25rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(204, 0, 0, 0.18);
+  border-radius: 18px;
+  background: rgba(204, 0, 0, 0.05);
+}
+
+.realtime-error-box p {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.realtime-standby {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+  padding: 2rem 1.25rem 3rem;
+  text-align: center;
+}
+
+.realtime-mic-button {
+  display: inline-flex;
+  width: 9rem;
+  height: 9rem;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #202020, #101010);
+  color: #fff;
+  box-shadow: 0 24px 40px rgba(17, 17, 17, 0.18);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.realtime-mic-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 28px 48px rgba(17, 17, 17, 0.24);
+}
+
+.realtime-mic-button:disabled {
+  cursor: wait;
+  opacity: 0.85;
+}
+
+.realtime-mic-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.realtime-mic-button svg {
+  width: 3.25rem;
+  height: 3.25rem;
+  fill: currentColor;
+}
+
+.realtime-standby-copy {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.realtime-headline {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+}
+
+.realtime-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.realtime-meter-card {
+  display: flex;
+  width: min(340px, 100%);
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.35rem 1rem 1rem;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 16px 28px rgba(17, 17, 17, 0.05);
+}
+
+.realtime-meter-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.realtime-voice-meter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.38rem;
+  min-height: 48px;
+}
+
+.realtime-voice-bar {
+  width: 8px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--ink);
+  opacity: 0.38;
+  transform: scaleY(0.45);
+  transform-origin: bottom center;
+  transition: transform 90ms linear, opacity 120ms ease;
+  animation: realtime-meter-idle 1.6s ease-in-out infinite;
+}
+
+.realtime-voice-meter.is-signal .realtime-voice-bar {
+  background: #f59f63;
+  opacity: 0.9;
+}
+
+.realtime-voice-bar:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.realtime-voice-bar:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.realtime-voice-bar:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+.realtime-voice-bar:nth-child(5) {
+  animation-delay: 0.48s;
+}
+
+.realtime-voice-meter.is-live .realtime-voice-bar {
+  opacity: 0.95;
+  animation: realtime-meter-live 0.9s ease-in-out infinite;
+}
+
+.realtime-transcript-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  padding: 1.15rem 1.5rem 0;
+}
+
+.realtime-transcript-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+}
+
+.realtime-transcript-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.realtime-transcript-label svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.realtime-output-pill {
+  padding: 0.52rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.06);
+  color: var(--ink);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.realtime-transcript-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  padding-bottom: 1.5rem;
+}
+
+.realtime-transcript-text {
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  color: var(--ink);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: clamp(1.1rem, 0.96rem + 0.7vw, 1.55rem);
+  line-height: 1.46;
+  letter-spacing: -0.025em;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.realtime-cursor {
+  display: inline-block;
+  width: 0.6ch;
+  height: 1em;
+  margin-left: 0.16em;
+  background: var(--ink);
+  vertical-align: -0.08em;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+.realtime-empty-state {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.95rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.realtime-empty-title {
+  margin: 0;
+  color: rgba(17, 17, 17, 0.48);
+  font-size: clamp(1rem, 0.88rem + 0.5vw, 1.35rem);
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.025em;
+}
+
+.realtime-empty-subtitle {
+  margin: 0.2rem 0 0;
+  color: rgba(17, 17, 17, 0.32);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.realtime-controls {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.realtime-stop-button,
+.realtime-reset-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 0.8rem 1.4rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.realtime-stop-button:hover,
+.realtime-reset-button:hover {
+  transform: translateY(-1px);
+}
+
+.realtime-stop-button {
+  border: none;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 16px 30px rgba(17, 17, 17, 0.18);
+}
+
+.realtime-stop-icon {
+  width: 0.88rem;
+  height: 0.88rem;
+  border-radius: 3px;
+  background: currentColor;
+}
+
+.realtime-reset-button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.realtime-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.35rem 1rem;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+}
+
+@keyframes realtime-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(17, 17, 17, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(17, 17, 17, 0);
+  }
+}
+
+@keyframes realtime-meter-idle {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(0.7);
+    opacity: 0.8;
+  }
+}
+
+@keyframes realtime-meter-live {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  25% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.55);
+  }
+  75% {
+    transform: scaleY(0.9);
+  }
+}
+
+@keyframes cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 /* ── Input section ─────────────────────────────────── */
@@ -740,6 +1234,76 @@ button {
 
   .accuracy-result {
     padding: 0 0.75rem 0.75rem;
+  }
+
+  .realtime-workspace {
+    padding: 0.75rem;
+  }
+
+  .realtime-panel {
+    min-height: calc(100vh - 82px);
+    border-radius: 24px;
+  }
+
+  .realtime-panel-header {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .realtime-title {
+    font-size: 1.55rem;
+  }
+
+  .realtime-standby {
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .realtime-mic-button {
+    width: 7.5rem;
+    height: 7.5rem;
+  }
+
+  .realtime-mic-button svg {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .realtime-meter-card {
+    width: 100%;
+  }
+
+  .realtime-transcript-shell {
+    padding: 1rem 1rem 0;
+  }
+
+  .realtime-transcript-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .realtime-transcript-text {
+    max-width: none;
+    font-size: 1.08rem;
+    line-height: 1.5;
+  }
+
+  .realtime-empty-title {
+    font-size: 1rem;
+  }
+
+  .realtime-empty-subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+  }
+
+  .realtime-controls {
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .realtime-footer {
+    padding: 0.85rem 1rem;
+    font-size: 0.6rem;
   }
 
   .transcript-box {

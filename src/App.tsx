@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AudioWaveform from "./AudioWaveform";
 import LiveWaveform from "./LiveWaveform";
+import RealtimeWorkspace from "./RealtimeWorkspace";
 import {
   createFileDescriptor,
   createMicrophoneDescriptor,
@@ -28,6 +29,7 @@ import {
   type TranscriptWord,
 } from "./lib/transcription-types";
 import { ACCURACY_MODEL_ID, loadAccuracyTranscriber, transcribeAccuracyAudio } from "./lib/transcriber";
+import { loadRealtimeTranscriber } from "./lib/realtime-transcriber";
 import { loadTimestampTranscriber, transcribeTimestampedAudio } from "./lib/whisper-transcriber";
 
 const LANGUAGE_OPTIONS = [
@@ -41,6 +43,8 @@ const LANGUAGE_OPTIONS = [
   { value: "nl", label: "Dutch" },
   { value: "hi", label: "Hindi" },
 ];
+
+const MODEL_READY_ANIMATION_MS = 760;
 
 type CaptureState = {
   status: "idle" | "recording" | "stopping";
@@ -69,6 +73,7 @@ function App() {
 
   const [modelStates, setModelStates] = useState<Record<TranscriptionMode, ModelState>>({
     accuracy: { status: "idle", progress: 0, statusText: "Loading…" },
+    realtime: { status: "idle", progress: 0, statusText: "Loading…" },
     timestamps: { status: "idle", progress: 0, statusText: "Loading…" },
   });
   const [captureState, setCaptureState] = useState<CaptureState>({
@@ -82,6 +87,12 @@ function App() {
   const [focusDirection, setFocusDirection] = useState<"down" | "up">("down");
   const copiedTimerRef = useRef<number>(0);
   const isAutoScrolling = useRef(false);
+  const modelStatesRef = useRef(modelStates);
+  const modelReadyTimersRef = useRef<Record<TranscriptionMode, number | null>>({
+    accuracy: null,
+    realtime: null,
+    timestamps: null,
+  });
 
   const dragCounter = useRef(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -98,6 +109,9 @@ function App() {
 
   const displayTranscript = currentRecord ? recordToTranscript(currentRecord) : liveTranscript;
   const modelState = modelStates[mode];
+  const loadingProgress = Math.max(0, Math.min(100, Math.round(modelState.progress)));
+  const loadingLabel = modelState.status === "error" ? modelState.statusText : "Loading model";
+  const isFinishingLoad = modelState.status === "loading" && loadingProgress === 100;
   const hasMedia = localMediaUrl !== null;
   const canSyncPlayback =
     hasMedia && displayTranscript?.mode === "timestamps" && (displayTranscript.chunks?.length ?? 0) > 0;
@@ -118,9 +132,16 @@ function App() {
   }, [history, historyLoaded]);
 
   useEffect(() => {
+    modelStatesRef.current = modelStates;
+  }, [modelStates]);
+
+  useEffect(() => {
     return () => {
       stopTracks(captureStreamRef.current ?? undefined);
       cleanupCaptureTimer(captureTimerRef.current);
+      for (const timer of Object.values(modelReadyTimersRef.current)) {
+        if (timer !== null) window.clearTimeout(timer);
+      }
       if (localMediaObjectUrlRef.current) URL.revokeObjectURL(localMediaObjectUrlRef.current);
     };
   }, []);
@@ -284,8 +305,49 @@ function App() {
 
   /* ── State helpers ───────────────────────────────── */
 
-  const updateModelState = (targetMode: TranscriptionMode, nextState: ModelState) => {
+  const clearModelReadyTimer = (targetMode: TranscriptionMode) => {
+    const timer = modelReadyTimersRef.current[targetMode];
+    if (timer === null) return;
+    window.clearTimeout(timer);
+    modelReadyTimersRef.current[targetMode] = null;
+  };
+
+  const commitModelState = (targetMode: TranscriptionMode, nextState: ModelState) => {
+    modelStatesRef.current = { ...modelStatesRef.current, [targetMode]: nextState };
     setModelStates((prev) => ({ ...prev, [targetMode]: nextState }));
+  };
+
+  const updateModelState = (targetMode: TranscriptionMode, nextState: ModelState) => {
+    const previousState = modelStatesRef.current[targetMode];
+
+    if (nextState.status === "loading") {
+      clearModelReadyTimer(targetMode);
+      commitModelState(targetMode, nextState);
+      return;
+    }
+
+    if (nextState.status === "error") {
+      clearModelReadyTimer(targetMode);
+      commitModelState(targetMode, nextState);
+      return;
+    }
+
+    if (nextState.status === "ready" && previousState.status !== "ready") {
+      clearModelReadyTimer(targetMode);
+      commitModelState(targetMode, {
+        ...nextState,
+        status: "loading",
+        progress: 100,
+        statusText: "Loading model…",
+      });
+      modelReadyTimersRef.current[targetMode] = window.setTimeout(() => {
+        modelReadyTimersRef.current[targetMode] = null;
+        commitModelState(targetMode, nextState);
+      }, MODEL_READY_ANIMATION_MS);
+      return;
+    }
+
+    commitModelState(targetMode, nextState);
   };
 
   const resetOutput = () => {
@@ -353,6 +415,8 @@ function App() {
     try {
       if (targetMode === "accuracy") {
         await loadAccuracyTranscriber((s) => updateModelState("accuracy", s));
+      } else if (targetMode === "realtime") {
+        await loadRealtimeTranscriber((s) => updateModelState("realtime", s));
       } else {
         await loadTimestampTranscriber((s) => updateModelState("timestamps", s));
       }
@@ -394,16 +458,19 @@ function App() {
   /* ── Drag and drop ───────────────────────────────── */
 
   const handleDragEnter = (e: React.DragEvent) => {
+    if (screen !== "workspace" || mode === "realtime") return;
     e.preventDefault();
     dragCounter.current++;
     if (dragCounter.current === 1) setIsDragOver(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (screen !== "workspace" || mode === "realtime") return;
     e.preventDefault();
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    if (screen !== "workspace" || mode === "realtime") return;
     e.preventDefault();
     dragCounter.current--;
     if (dragCounter.current <= 0) {
@@ -413,6 +480,7 @@ function App() {
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    if (screen !== "workspace" || mode === "realtime") return;
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragOver(false);
@@ -660,6 +728,10 @@ function App() {
               <h2>Accuracy</h2>
               <p>Create a high-quality transcript</p>
             </button>
+            <button type="button" className="mode-card" onClick={() => selectMode("realtime")}>
+              <h2>Realtime</h2>
+              <p>Stream live microphone transcription</p>
+            </button>
             <button type="button" className="mode-card" onClick={() => selectMode("timestamps")}>
               <h2>Captions</h2>
               <p>Create a timestamped transcript</p>
@@ -674,7 +746,7 @@ function App() {
           <header className="top-bar">
             <span className="top-bar-title">Transcribe</span>
             <span className="top-bar-divider">/</span>
-            <span className="top-bar-mode">{mode === "accuracy" ? "Accuracy" : "Timestamps"}</span>
+            <span className="top-bar-mode">{getModeLabel(mode)}</span>
             <button type="button" className="top-bar-back" onClick={goBack}>
               Back
             </button>
@@ -683,16 +755,28 @@ function App() {
           {/* Model loading */}
           {modelState.status !== "ready" && (
             <div className="loading-section">
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${modelState.progress}%` }} />
-              </div>
-              <p className="loading-status">{modelState.statusText}</p>
+              {modelState.status !== "error" && (
+                <div
+                  className="progress-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={loadingProgress}
+                  aria-valuetext={loadingLabel}
+                >
+                  <div
+                    className={`progress-fill${isFinishingLoad ? " is-finishing" : ""}`}
+                    style={{ width: `${loadingProgress}%` }}
+                  />
+                </div>
+              )}
+              <p className="loading-status">{loadingLabel}</p>
               {errorText && <p className="error-text">{errorText}</p>}
             </div>
           )}
 
           {/* Input area (accuracy always, timestamps only when no media) */}
-          {modelState.status === "ready" && !showTimestampView && (
+          {modelState.status === "ready" && mode !== "realtime" && !showTimestampView && (
             <div className="accuracy-workspace">
               <div className={`input-section${hasAccuracyText ? " compact" : ""}`}>
                 {captureState.status === "recording" ? (
@@ -759,6 +843,13 @@ function App() {
                 </div>
               )}
             </div>
+          )}
+
+          {modelState.status === "ready" && mode === "realtime" && (
+            <RealtimeWorkspace
+              onResetOutput={resetOutput}
+              onComplete={(result) => finalizeTranscription(createMicrophoneDescriptor(), result)}
+            />
           )}
 
           {/* Timestamp workspace — side by side */}
@@ -997,6 +1088,12 @@ function recordToTranscript(record: TranscriptRecord): TranscriptionResult {
     words: record.words,
     tps: record.tps,
   };
+}
+
+function getModeLabel(mode: TranscriptionMode): string {
+  if (mode === "accuracy") return "Accuracy";
+  if (mode === "realtime") return "Realtime";
+  return "Timestamps";
 }
 
 function getWordsForChunk(words: TranscriptWord[], chunk: TranscriptChunk): TranscriptWord[] {

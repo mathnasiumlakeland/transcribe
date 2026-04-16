@@ -1,4 +1,4 @@
-export type TranscriptionMode = "accuracy" | "timestamps";
+export type TranscriptionMode = "accuracy" | "timestamps" | "realtime";
 
 export type ModelState = {
   status: "idle" | "loading" | "ready" | "error";
